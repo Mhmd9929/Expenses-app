@@ -1,0 +1,16 @@
+{
+  "name": "expenses-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline-first PWA for tracking personal monthly expenses.",
+  "type": "module",
+  "scripts": {
+    "start": "http-server app -p 8080 -c-1",
+    "test": "node tests/e2e.mjs",
+    "icons": "node scripts/build-icons.mjs"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "playwright": "1.56.1"
+  }
+}
