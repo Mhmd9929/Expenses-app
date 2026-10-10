@@ -1,6 +1,7 @@
 // Dependency-free SVG charts. Each function returns an SVG string.
 // Hit targets carry data-tip so the app's shared tooltip can show values on hover/tap.
 import { esc } from './utils.js';
+import { t } from './i18n.js';
 
 function niceMax(v, ticks = 4) {
   if (!(v > 0)) return { max: 1, step: 0.25 };
@@ -54,9 +55,9 @@ export function barChart(data, { fmtTick, budget = null, height = 190 } = {}) {
   if (budget > 0) {
     const y = top + plotH - (budget / scale.max) * plotH;
     budgetLine = `<line class="budget-line" x1="${padL}" x2="${W - padR}" y1="${y}" y2="${y}"/>`
-      + `<text class="tick" x="${W - padR}" y="${y - 4}" text-anchor="end">Budget</text>`;
+      + `<text class="tick" x="${W - padR}" y="${y - 4}" text-anchor="end">${esc(t('budget'))}</text>`;
   }
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Monthly totals bar chart">
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('barAria'))}">
     ${yAxis(scale, W, padL, padR, top, plotH, fmtTick)}${bars}${budgetLine}${labels}${hits}</svg>`;
 }
 
@@ -91,7 +92,7 @@ export function donutChart(segments, { centerTop = '', centerBottom = '' } = {})
   } else {
     paths = `<circle cx="${c}" cy="${c}" r="${r}" fill="none" class="empty-ring" stroke-width="${sw}"/>`;
   }
-  return `<svg class="chart donut" viewBox="0 0 ${S} ${S}" role="img" aria-label="Category breakdown donut chart">
+  return `<svg class="chart donut" viewBox="0 0 ${S} ${S}" role="img" aria-label="${esc(t('donutAria'))}">
     ${paths}
     <text class="donut-top" x="${c}" y="${c - 4}" text-anchor="middle">${esc(centerTop)}</text>
     <text class="donut-bottom" x="${c}" y="${c + 16}" text-anchor="middle">${esc(centerBottom)}</text>
@@ -121,7 +122,7 @@ export function lineChart(values, { fmtTick, tips = [], avg = null, lastDay = va
   let avgLine = '';
   if (avg > 0) {
     avgLine = `<line class="avg-line" x1="${padL}" x2="${W - padR}" y1="${y(avg)}" y2="${y(avg)}"/>`
-      + `<text class="tick" x="${W - padR}" y="${y(avg) - 4}" text-anchor="end">avg</text>`;
+      + `<text class="tick" x="${W - padR}" y="${y(avg) - 4}" text-anchor="end">${esc(t('avg'))}</text>`;
   }
   let hits = '';
   const slot = plotW / Math.max(1, n - 1);
@@ -130,6 +131,6 @@ export function lineChart(values, { fmtTick, tips = [], avg = null, lastDay = va
       + `<circle class="dot" cx="${x(i)}" cy="${y(shown[i])}" r="4"/>`
       + `<rect class="hit" x="${x(i) - slot / 2}" y="${top}" width="${slot}" height="${plotH}" data-tip="${esc(tips[i] || '')}"/></g>`;
   }
-  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Daily spending line chart">
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(t('lineAria'))}">
     ${yAxis(scale, W, padL, padR, top, plotH, fmtTick)}${area}${avgLine}${line}${ticks}${hits}</svg>`;
 }

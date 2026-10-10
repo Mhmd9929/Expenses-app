@@ -1,4 +1,5 @@
 // Small shared helpers: dates, formatting, escaping, ids, files.
+import { locale, t } from './i18n.js';
 
 export const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -36,21 +37,26 @@ export function monthRange(a, b) {
 
 export function monthLabel(monthKey, style = 'long') {
   const d = parseISODate(`${monthKey}-01`);
-  return d.toLocaleDateString(undefined, { month: style, year: 'numeric' });
+  return d.toLocaleDateString(locale(), { month: style, year: 'numeric' });
 }
 export function monthShort(monthKey) {
-  return parseISODate(`${monthKey}-01`).toLocaleDateString(undefined, { month: 'short' });
+  return parseISODate(`${monthKey}-01`).toLocaleDateString(locale(), { month: 'short' });
+}
+
+/** Short "day month" label, e.g. "Oct 5" / "5 أكتوبر". */
+export function dayMonth(iso) {
+  return parseISODate(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
 }
 
 export function dayLabel(iso) {
-  const t = today();
-  if (iso === t) return 'Today';
+  const td = today();
+  if (iso === td) return t('today');
   const y = new Date();
   y.setDate(y.getDate() - 1);
-  if (iso === toISODate(y)) return 'Yesterday';
-  return parseISODate(iso).toLocaleDateString(undefined, {
+  if (iso === toISODate(y)) return t('yesterday');
+  return parseISODate(iso).toLocaleDateString(locale(), {
     weekday: 'short', day: 'numeric', month: 'short',
-    year: iso.slice(0, 4) === t.slice(0, 4) ? undefined : 'numeric',
+    year: iso.slice(0, 4) === td.slice(0, 4) ? undefined : 'numeric',
   });
 }
 
@@ -58,15 +64,24 @@ export const round2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 10
 
 const fmtCache = new Map();
 export function formatMoney(amount, currency, opts = {}) {
-  const key = `${currency}|${opts.compact ? 1 : 0}`;
+  const loc = locale();
+  const key = `${loc}|${currency}|${opts.compact ? 1 : 0}`;
   let f = fmtCache.get(key);
   if (!f) {
     try {
-      f = new Intl.NumberFormat(undefined, {
+      const nf = new Intl.NumberFormat(loc, {
         style: 'currency', currency,
         notation: opts.compact ? 'compact' : 'standard',
         maximumFractionDigits: opts.compact ? 1 : 2,
       });
+      f = nf;
+      if (loc.startsWith('ar')) {
+        // Isolate the symbol so Latin ones like "US$" don't get reordered in RTL text.
+        f = {
+          format: (n) => nf.formatToParts(n)
+            .map((p) => (p.type === 'currency' ? `\u2068${p.value}\u2069` : p.value)).join(''),
+        };
+      }
     } catch {
       f = { format: (n) => `${currency} ${Number(n).toFixed(2)}` };
     }

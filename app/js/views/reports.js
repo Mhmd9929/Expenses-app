@@ -3,10 +3,11 @@ import {
 } from '../store.js';
 import {
   esc, monthLabel, monthShort, currentMonth, addMonths, monthRange, daysInMonth, today,
-  formatPct, round2, monthOf,
+  formatPct, round2, monthOf, dayMonth, pad2,
 } from '../utils.js';
 import { money, moneyTick } from '../ui.js';
 import { barChart, donutChart, lineChart } from '../charts.js';
+import { t, catName } from '../i18n.js';
 
 const view = { month: currentMonth(), range: 6, a: null, b: null };
 
@@ -51,13 +52,17 @@ function insights(month) {
     <strong data-testid="${testid}">${value}</strong><span class="muted small">${sub}</span></div>`;
 
   return `<div class="insights">
-    ${card('Biggest category', top ? `${esc(catById(top[0]).icon)} ${esc(catById(top[0]).name)}` : '—',
-    top ? `${esc(money(top[1]))} · ${esc(formatPct((top[1] / total) * 100))} of total` : 'No spending yet', 'ins-top')}
-    ${card('Biggest increase', inc ? `${esc(catById(inc.id).icon)} ${esc(catById(inc.id).name)}` : '—',
-    inc ? `+${esc(money(inc.d))}${inc.p !== null ? ` (${esc(formatPct(inc.p, true))})` : ' (new)'} vs ${esc(monthShort(addMonths(month, -1)))}` : 'No increases vs last month', 'ins-inc')}
-    ${card('Average per day', esc(money(avg)), isCurrent ? `over ${elapsed} day${elapsed === 1 ? '' : 's'} so far` : `over ${dim} days`, 'ins-avg')}
-    ${card(isCurrent ? 'Projected month-end' : 'Month total', esc(money(projected)),
-    budget > 0 ? (projected > budget ? `<span class="neg">${esc(money(projected - budget))} over budget</span>` : `${esc(money(budget - projected))} under budget`) : (isCurrent ? 'at the current pace' : '&nbsp;'), 'ins-proj')}
+    ${card(esc(t('biggestCategory')), top ? `${esc(catById(top[0]).icon)} ${esc(catName(catById(top[0])))}` : '—',
+    esc(top ? t('ofTotal', { amount: money(top[1]), pct: formatPct((top[1] / total) * 100) }) : t('noSpending')), 'ins-top')}
+    ${card(esc(t('biggestIncrease')), inc ? `${esc(catById(inc.id).icon)} ${esc(catName(catById(inc.id)))}` : '—',
+    esc(inc ? t('vsMonth', {
+      amount: `+${money(inc.d)}`,
+      pct: inc.p !== null ? ` (${formatPct(inc.p, true)})` : t('newCat'),
+      month: monthShort(addMonths(month, -1)),
+    }) : t('noIncreases')), 'ins-inc')}
+    ${card(esc(t('avgPerDay')), esc(money(avg)), esc(isCurrent ? t('overDaysSoFar', elapsed) : t('overDays', dim)), 'ins-avg')}
+    ${card(esc(t(isCurrent ? 'projected' : 'monthTotal')), esc(money(projected)),
+    budget > 0 ? (projected > budget ? `<span class="neg">${esc(t('overBudget', { amount: money(projected - budget) }))}</span>` : esc(t('underBudget', { amount: money(budget - projected) }))) : (isCurrent ? esc(t('atPace')) : '&nbsp;'), 'ins-proj')}
   </div>`;
 }
 
@@ -73,13 +78,13 @@ function barSection() {
   const totals = data.map((d) => d.value);
   const avg = totals.reduce((s, v) => s + v, 0) / totals.length;
   return `<section class="card">
-    <div class="section-head"><h2 class="section-title">Month by month</h2>
-      <div class="seg small" role="group" aria-label="Range">
+    <div class="section-head"><h2 class="section-title">${esc(t('monthByMonth'))}</h2>
+      <div class="seg small" role="group" aria-label="${esc(t('range'))}">
         <button type="button" class="seg-btn" data-range="6" aria-pressed="${view.range === 6}">6M</button>
         <button type="button" class="seg-btn" data-range="12" aria-pressed="${view.range === 12}">12M</button>
       </div></div>
     <div class="chart-box" data-testid="bar-chart">${barChart(data, { fmtTick: moneyTick, budget: state.settings.budget })}</div>
-    <p class="muted small">Average ${esc(money(avg))} per month · highest ${esc(money(Math.max(...totals)))}</p>
+    <p class="muted small">${esc(t('avgPerMonth', { avg: money(avg), max: money(Math.max(...totals)) }))}</p>
   </section>`;
 }
 
@@ -91,21 +96,25 @@ function donutSection(month) {
   const MAX = 7;
   const segs = rows.slice(0, MAX).map(([id, v]) => {
     const c = catById(id);
-    return { label: c.name, value: v, color: c.color, tip: `${c.name}: ${money(v)} (${formatPct((v / total) * 100)})` };
+    return {
+      label: catName(c), value: v, color: c.color, tip: `${catName(c)}: ${money(v)} (${formatPct((v / total) * 100)})`,
+    };
   });
   const rest = rows.slice(MAX).reduce((s, [, v]) => s + v, 0);
-  if (rest > 0) segs.push({ label: 'Others', value: rest, color: 'var(--muted)', tip: `Others: ${money(rest)}` });
+  if (rest > 0) segs.push({
+    label: t('others'), value: rest, color: 'var(--muted)', tip: `${t('others')}: ${money(rest)}`,
+  });
   const legend = rows.map(([id, v]) => {
     const c = catById(id);
     const b = c.budget;
-    return `<tr><td><span class="swatch" style="--c:${esc(c.color)}"></span>${esc(c.icon)} ${esc(c.name)}</td>
+    return `<tr><td><span class="swatch" style="--c:${esc(c.color)}"></span>${esc(c.icon)} ${esc(catName(c))}</td>
       <td class="num">${esc(money(v))}</td><td class="num muted">${esc(formatPct((v / total) * 100))}</td>
-      <td class="num muted small">${b > 0 ? `${Math.round((v / b) * 100)}% of budget` : ''}</td></tr>`;
+      <td class="num muted small">${b > 0 ? esc(t('pctOfBudget', { pct: Math.round((v / b) * 100) })) : ''}</td></tr>`;
   }).join('');
   return `<section class="card">
-    <h2 class="section-title">By category</h2>
-    ${rows.length ? `<div class="donut-wrap" data-testid="donut">${donutChart(segs, { centerTop: money(total), centerBottom: `${rows.length} categor${rows.length === 1 ? 'y' : 'ies'}` })}</div>
-      <table class="table legend-table">${legend}</table>` : '<p class="muted">No expenses this month.</p>'}
+    <h2 class="section-title">${esc(t('byCategory'))}</h2>
+    ${rows.length ? `<div class="donut-wrap" data-testid="donut">${donutChart(segs, { centerTop: money(total), centerBottom: t('categoriesCount', rows.length) })}</div>
+      <table class="table legend-table">${legend}</table>` : `<p class="muted">${esc(t('noExpensesMonth'))}</p>`}
   </section>`;
 }
 
@@ -115,13 +124,13 @@ function lineSection(month) {
   const lastDay = isCurrent ? Number(today().slice(8, 10)) : values.length;
   const total = values.reduce((s, v) => s + v, 0);
   const avg = lastDay ? total / lastDay : 0;
-  const tips = values.map((v, i) => `${monthShort(month)} ${i + 1}: ${money(v)}`);
+  const tips = values.map((v, i) => `${dayMonth(`${month}-${pad2(i + 1)}`)}: ${money(v)}`);
   const peak = values.slice(0, lastDay).reduce((best, v, i) => (v > best.v ? { v, i } : best), { v: 0, i: -1 });
   return `<section class="card">
-    <h2 class="section-title">Daily spending</h2>
+    <h2 class="section-title">${esc(t('dailySpending'))}</h2>
     ${total > 0 ? `<div class="chart-box" data-testid="line-chart">${lineChart(values, { fmtTick: moneyTick, tips, avg, lastDay })}</div>
-      <p class="muted small">Busiest day: ${esc(monthShort(month))} ${peak.i + 1} (${esc(money(peak.v))}) · dashed line = daily average</p>`
-    : '<p class="muted">No expenses this month.</p>'}
+      <p class="muted small">${esc(t('busiestDay', { day: dayMonth(`${month}-${pad2(peak.i + 1)}`), amount: money(peak.v) }))}</p>`
+    : `<p class="muted">${esc(t('noExpensesMonth'))}</p>`}
   </section>`;
 }
 
@@ -134,24 +143,24 @@ function compareSection(months) {
   const opt = (m, sel) => `<option value="${m}" ${m === sel ? 'selected' : ''}>${esc(monthLabel(m, 'short'))}</option>`;
   const rows = ids.map((id) => {
     const c = catById(id);
-    return `<tr><td>${esc(c.icon)} ${esc(c.name)}</td><td class="num">${esc(money(ta[id] || 0))}</td>
+    return `<tr><td>${esc(c.icon)} ${esc(catName(c))}</td><td class="num">${esc(money(ta[id] || 0))}</td>
       <td class="num">${esc(money(tb[id] || 0))}</td><td class="num">${deltaHtml(ta[id] || 0, tb[id] || 0)}</td></tr>`;
   }).join('');
   return `<section class="card">
-    <h2 class="section-title">Compare two months</h2>
+    <h2 class="section-title">${esc(t('compare'))}</h2>
     <div class="compare-pick">
-      <select name="a" aria-label="First month">${months.map((m) => opt(m, a)).join('')}</select>
-      <span class="muted">vs</span>
-      <select name="b" aria-label="Second month">${months.map((m) => opt(m, b)).join('')}</select>
+      <select name="a" aria-label="${esc(t('firstMonth'))}">${months.map((m) => opt(m, a)).join('')}</select>
+      <span class="muted">${esc(t('vs'))}</span>
+      <select name="b" aria-label="${esc(t('secondMonth'))}">${months.map((m) => opt(m, b)).join('')}</select>
     </div>
     <div class="compare-totals">
       <div><span class="muted small">${esc(monthLabel(a, 'short'))}</span><strong data-testid="cmp-a">${esc(money(totalA))}</strong></div>
       <div><span class="muted small">${esc(monthLabel(b, 'short'))}</span><strong data-testid="cmp-b">${esc(money(totalB))}</strong></div>
-      <div><span class="muted small">Change</span><strong data-testid="cmp-delta">${deltaHtml(totalA, totalB)}</strong></div>
+      <div><span class="muted small">${esc(t('change'))}</span><strong data-testid="cmp-delta">${deltaHtml(totalA, totalB)}</strong></div>
     </div>
     ${rows ? `<div class="table-scroll"><table class="table compare-table">
-      <thead><tr><th>Category</th><th class="num">${esc(monthShort(a))}</th><th class="num">${esc(monthShort(b))}</th><th class="num">Difference</th></tr></thead>
-      <tbody>${rows}</tbody></table></div>` : '<p class="muted">No expenses in either month.</p>'}
+      <thead><tr><th>${esc(t('category'))}</th><th class="num">${esc(monthShort(a))}</th><th class="num">${esc(monthShort(b))}</th><th class="num">${esc(t('difference'))}</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>` : `<p class="muted">${esc(t('noExpensesEither'))}</p>`}
   </section>`;
 }
 
@@ -163,8 +172,8 @@ export function render(root) {
   if (!months.includes(view.a)) view.a = months[months.length - 1];
 
   root.innerHTML = `
-    <header class="page-head"><h1>Reports</h1>
-      <select class="month-select" name="month" aria-label="Report month">
+    <header class="page-head"><h1>${esc(t('reports'))}</h1>
+      <select class="month-select" name="month" aria-label="${esc(t('reportMonth'))}">
         ${months.map((m) => `<option value="${m}" ${m === view.month ? 'selected' : ''}>${esc(monthLabel(m))}</option>`).join('')}
       </select></header>
     ${insights(view.month)}

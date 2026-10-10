@@ -3,6 +3,7 @@ import {
   state, catById, METHODS, deleteExpense, saveExpense, budgetLevels,
 } from './store.js';
 import { esc, formatMoney, dayLabel, monthOf } from './utils.js';
+import { t, catName, isRTL } from './i18n.js';
 
 export const money = (n, opts) => formatMoney(n, state.settings.currency, opts);
 export const moneyTick = (n) => formatMoney(n, state.settings.currency, { compact: true });
@@ -44,13 +45,13 @@ export function openSheet(html, { className = '' } = {}) {
   return dlg;
 }
 
-export function confirmDialog({ title, message = '', ok = 'OK', danger = false }) {
+export function confirmDialog({ title, message = '', ok = t('ok'), danger = false }) {
   return new Promise((resolve) => {
     const dlg = openSheet(`
       <h2 class="sheet-title">${esc(title)}</h2>
       ${message ? `<p class="muted">${esc(message)}</p>` : ''}
       <div class="sheet-actions">
-        <button type="button" class="btn secondary" data-close>Cancel</button>
+        <button type="button" class="btn secondary" data-close>${esc(t('cancel'))}</button>
         <button type="button" class="btn ${danger ? 'danger' : 'primary'}" data-ok>${esc(ok)}</button>
       </div>`, { className: 'confirm' });
     let result = false;
@@ -103,23 +104,24 @@ export function initTooltip() {
 // ---------- expense rows ----------
 
 export function methodLabel(id) {
-  return METHODS.find((m) => m.id === id)?.label || 'Other';
+  return t(`method.${METHODS.some((m) => m.id === id) ? id : 'other'}`);
 }
 
 export function expenseRow(e, { showDate = false } = {}) {
   const c = catById(e.categoryId);
-  const sub = [showDate ? dayLabel(e.date) : null, methodLabel(e.method), e.recurringId ? '↻ Monthly' : null]
+  const name = catName(c);
+  const sub = [showDate ? dayLabel(e.date) : null, methodLabel(e.method), e.recurringId ? t('monthly') : null]
     .filter(Boolean).join(' · ');
   return `<li class="swipe" data-id="${esc(e.id)}">
     <div class="swipe-actions">
-      <button type="button" class="act-edit" data-act="edit">Edit</button>
-      <button type="button" class="act-del" data-act="delete">Delete</button>
+      <button type="button" class="act-edit" data-act="edit">${esc(t('edit'))}</button>
+      <button type="button" class="act-del" data-act="delete">${esc(t('delete'))}</button>
     </div>
-    <button type="button" class="swipe-content row" aria-label="Edit ${esc(c.name)} ${esc(money(e.amount))}">
+    <button type="button" class="swipe-content row" aria-label="${esc(t('edit'))} ${esc(name)} ${esc(money(e.amount))}">
       <span class="cat-dot" style="--c:${esc(c.color)}">${esc(c.icon)}</span>
       <span class="row-main">
-        <span class="row-title">${esc(e.note || c.name)}</span>
-        <span class="row-sub">${esc(e.note ? `${c.name} · ${sub}` : sub)}</span>
+        <span class="row-title">${esc(e.note || name)}</span>
+        <span class="row-sub">${esc(e.note ? `${name} · ${sub}` : sub)}</span>
       </span>
       <span class="row-amount">${esc(money(e.amount))}</span>
     </button>
@@ -132,7 +134,7 @@ export async function deleteWithUndo(id) {
   if (!e) return;
   const copy = { ...e };
   await deleteExpense(id);
-  toast('Expense deleted', { action: 'Undo', onAction: () => saveExpense(copy), duration: 5000 });
+  toast(t('expenseDeleted'), { action: t('undo'), onAction: () => saveExpense(copy), duration: 5000 });
 }
 
 /**
@@ -150,30 +152,33 @@ export function enableSwipe(list, { onEdit }) {
     if (!content) return;
     const row = content.closest('.swipe');
     start = {
-      x: e.clientX, y: e.clientY, row, content, base: row.classList.contains('open') ? OPEN : 0, dx: 0, dir: null,
+      x: e.clientX, y: e.clientY, row, content, base: row.classList.contains('open') ? OPEN : 0, dx: 0, dir: null, side: isRTL() ? -1 : 1,
     };
   });
   list.addEventListener('pointermove', (e) => {
     if (!start) return;
-    const dx = e.clientX - start.x; const dy = e.clientY - start.y;
+    // Work in LTR terms; in RTL the row slides the other way.
+    const dx = (e.clientX - start.x) * start.side; const dy = e.clientY - start.y;
     if (!start.dir && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) start.dir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
     if (start.dir !== 'h') return;
     start.dx = dx;
     start.row.classList.add('dragging');
     const x = Math.min(0, Math.max(OPEN - 40, start.base + dx));
     start.content.style.transition = 'none';
-    start.content.style.transform = `translateX(${x}px)`;
+    start.content.style.transform = `translateX(${x * start.side}px)`;
   });
   const end = () => {
     if (!start) return;
-    const { row, content, base, dx, dir } = start;
+    const {
+      row, content, base, dx, dir, side,
+    } = start;
     start = null;
     row.classList.remove('dragging');
     content.style.transition = '';
     if (dir === 'h') {
       const open = base + dx < OPEN / 2;
       row.classList.toggle('open', open);
-      content.style.transform = open ? `translateX(${OPEN}px)` : '';
+      content.style.transform = open ? `translateX(${OPEN * side}px)` : '';
       if (open) closeAll(row);
       row.dataset.swiped = '1';
       setTimeout(() => { delete row.dataset.swiped; }, 50);
@@ -203,8 +208,8 @@ export function announceBudgetCrossings(month, before) {
   const msgs = [];
   for (const [id, lvl] of Object.entries(after)) {
     if (lvl > (before[id] || 0)) {
-      const name = id === '__total' ? 'Monthly budget' : catById(id).name;
-      msgs.push({ lvl, text: lvl >= 100 ? `${name}: budget exceeded` : `${name}: 80% of budget used` });
+      const name = id === '__total' ? t('monthlyBudget') : catName(catById(id));
+      msgs.push({ lvl, text: t(lvl >= 100 ? 'budgetExceeded' : 'budget80', { name }) });
     }
   }
   msgs.sort((a, b) => b.lvl - a.lvl).slice(0, 2).forEach((m, i) => {
@@ -224,7 +229,7 @@ export function progressBar(spent, budget) {
 
 export function statusBadge(spent, budget) {
   const pct = budget > 0 ? (spent / budget) * 100 : 0;
-  if (pct >= 100) return '<span class="badge critical">⛔ Over budget</span>';
-  if (pct >= 80) return '<span class="badge warning">⚠️ 80%+ used</span>';
+  if (pct >= 100) return `<span class="badge critical">${esc(t('badgeOver'))}</span>`;
+  if (pct >= 80) return `<span class="badge warning">${esc(t('badge80'))}</span>`;
   return '';
 }

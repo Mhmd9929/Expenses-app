@@ -8,6 +8,9 @@ import {
   toast, announceBudgetCrossings, deleteWithUndo, money,
 } from '../ui.js';
 import { back } from '../router.js';
+import {
+  t, catName, locale,
+} from '../i18n.js';
 
 const LAST_KEY = 'expenses:last';
 const readLast = () => { try { return JSON.parse(localStorage.getItem(LAST_KEY)) || {}; } catch { return {}; } };
@@ -15,7 +18,7 @@ const writeLast = (v) => { try { localStorage.setItem(LAST_KEY, JSON.stringify(v
 
 function currencySymbol() {
   try {
-    const parts = new Intl.NumberFormat(undefined, { style: 'currency', currency: state.settings.currency }).formatToParts(0);
+    const parts = new Intl.NumberFormat(locale(), { style: 'currency', currency: state.settings.currency }).formatToParts(0);
     return parts.find((p) => p.type === 'currency')?.value || state.settings.currency;
   } catch { return state.settings.currency; }
 }
@@ -30,7 +33,7 @@ export const live = false; // don't re-render while the user is typing
 export function render(root, { param, query }) {
   const editing = param ? state.expenses.find((e) => e.id === param) : null;
   if (param && !editing) {
-    root.innerHTML = '<div class="empty"><p>That expense no longer exists.</p><a class="link" href="#/list">Back to expenses</a></div>';
+    root.innerHTML = `<div class="empty"><p>${esc(t('expenseGone'))}</p><a class="link" href="#/list">${esc(t('backToList'))}</a></div>`;
     return;
   }
   const last = readLast();
@@ -49,42 +52,42 @@ export function render(root, { param, query }) {
 
   const chips = state.categories.map((c) => `
     <button type="button" class="chip" data-cat="${esc(c.id)}" style="--c:${esc(c.color)}" aria-pressed="${c.id === form.categoryId}">
-      <span class="chip-icon">${esc(c.icon)}</span><span>${esc(c.name)}</span>
+      <span class="chip-icon">${esc(c.icon)}</span><span>${esc(catName(c))}</span>
     </button>`).join('');
 
   const methods = METHODS.map((m) => `
-    <button type="button" class="seg-btn" data-method="${m.id}" aria-pressed="${m.id === form.method}">${m.icon} ${m.label}</button>`).join('');
+    <button type="button" class="seg-btn" data-method="${m.id}" aria-pressed="${m.id === form.method}">${m.icon} ${esc(t(`method.${m.id}`))}</button>`).join('');
 
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'];
 
   root.innerHTML = `
     <header class="top-bar">
-      <button type="button" class="icon-btn" data-action="close" aria-label="Close">✕</button>
-      <h1 class="top-title">${editing ? 'Edit expense' : 'Add expense'}</h1>
-      ${editing ? '<button type="button" class="icon-btn danger-text" data-action="delete" aria-label="Delete expense">🗑</button>' : '<span class="icon-btn-spacer"></span>'}
+      <button type="button" class="icon-btn" data-action="close" aria-label="${esc(t('close'))}">✕</button>
+      <h1 class="top-title">${esc(t(editing ? 'editTitle' : 'addTitle'))}</h1>
+      ${editing ? `<button type="button" class="icon-btn danger-text" data-action="delete" aria-label="${esc(t('deleteExpense'))}">🗑</button>` : '<span class="icon-btn-spacer"></span>'}
     </header>
     <form class="entry" novalidate>
       <div class="amount-display" aria-live="polite">
         <span class="amount-currency">${esc(currencySymbol())}</span>
         <span class="amount-value" data-testid="amount">${esc(form.amount)}</span>
       </div>
-      <div class="chips" role="group" aria-label="Category">${chips}</div>
+      <div class="chips" role="group" aria-label="${esc(t('category'))}">${chips}</div>
       <div class="entry-row">
-        <div class="seg" role="group" aria-label="Payment method">${methods}</div>
+        <div class="seg" role="group" aria-label="${esc(t('paymentMethod'))}">${methods}</div>
       </div>
       <div class="entry-row two">
-        <label class="field compact"><span class="field-label">Date</span>
+        <label class="field compact"><span class="field-label">${esc(t('date'))}</span>
           <input type="date" name="date" value="${esc(form.date)}" max="2100-12-31" required></label>
-        <label class="field compact"><span class="field-label">Note</span>
-          <input type="text" name="note" value="${esc(form.note)}" placeholder="Optional" maxlength="120" enterkeyhint="done" autocomplete="off"></label>
+        <label class="field compact"><span class="field-label">${esc(t('note'))}</span>
+          <input type="text" name="note" value="${esc(form.note)}" placeholder="${esc(t('optional'))}" maxlength="120" enterkeyhint="done" autocomplete="off"></label>
       </div>
       ${editing
-    ? (editing.recurringId ? '<p class="muted small center">↻ Added by a monthly recurring expense (manage in Settings).</p>' : '')
-    : `<label class="toggle-row"><input type="checkbox" name="repeat"><span>Repeat every month</span></label>`}
+    ? (editing.recurringId ? `<p class="muted small center">${esc(t('addedByRecurring'))}</p>` : '')
+    : `<label class="toggle-row"><input type="checkbox" name="repeat"><span>${esc(t('repeatMonthly'))}</span></label>`}
       <div class="keypad">
-        ${keys.map((k) => `<button type="button" class="key" data-key="${k}" aria-label="${k === 'del' ? 'Backspace' : k}">${k === 'del' ? '⌫' : k}</button>`).join('')}
+        ${keys.map((k) => `<button type="button" class="key" data-key="${k}" aria-label="${k === 'del' ? esc(t('backspace')) : k}">${k === 'del' ? '⌫' : k}</button>`).join('')}
       </div>
-      <button type="submit" class="btn primary big" data-testid="save">${editing ? 'Save changes' : 'Save expense'}</button>
+      <button type="submit" class="btn primary big" data-testid="save">${esc(t(editing ? 'saveChanges' : 'saveExpense'))}</button>
     </form>`;
 
   const $ = (s) => root.querySelector(s);
@@ -158,7 +161,7 @@ export function render(root, { param, query }) {
       amountEl.parentElement.classList.remove('shake');
       void amountEl.offsetWidth;
       amountEl.parentElement.classList.add('shake');
-      toast('Enter an amount first');
+      toast(t('enterAmount'));
       return;
     }
     const date = formEl.date.value || today();
@@ -179,7 +182,7 @@ export function render(root, { param, query }) {
     writeLast({ categoryId: form.categoryId, method: form.method });
     document.removeEventListener('keydown', onKey);
     const crossed = announceBudgetCrossings(month, before);
-    if (!crossed) toast(`${editing ? 'Updated' : 'Saved'} ${money(amount)} · ${catById(form.categoryId).name}`);
+    if (!crossed) toast(t(editing ? 'updated' : 'saved', { amount: money(amount), category: catName(catById(form.categoryId)) }));
     back();
   });
 }

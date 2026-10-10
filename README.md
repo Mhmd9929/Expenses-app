@@ -22,6 +22,7 @@ All data stays on your device in IndexedDB, so there's no backend and no login.
 - **Categories**: 12 defaults (Food, Groceries, Transport, Fuel, Rent, Bills & Utilities, Shopping, Health, Entertainment, Education, Travel, Other) with icons and colors. You can add, rename, recolor and delete them; a deleted category's expenses move to "Other".
 - **Settings**: currency (shown on all amounts), overall and per-category monthly budgets, auto/light/dark theme, recurring expenses, CSV export, JSON backup and restore, and erase all data.
 - **Recurring expenses**: rent, subscriptions and similar costs are added automatically each month. Months missed while the app was closed are caught up next time you open it.
+- **Arabic and English**: choose Auto, English or العربية in Settings → Language. Arabic uses a full right-to-left layout with Arabic month names, and the default categories are translated. Phones set to Arabic pick it automatically.
 - **Budget alerts**: a notice appears when a category or the overall budget passes 80% and again at 100%. Categories over 80% are also flagged on Home.
 
 ## Project layout

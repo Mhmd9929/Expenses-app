@@ -3,6 +3,7 @@ import * as db from './db.js';
 import {
   uid, round2, today, monthOf, currentMonth, addMonths, daysInMonth, pad2, sum,
 } from './utils.js';
+import { t } from './i18n.js';
 
 export const BACKUP_VERSION = 1;
 
@@ -32,9 +33,9 @@ export const CATEGORY_ICONS = [
 ];
 
 export const METHODS = [
-  { id: 'cash', label: 'Cash', icon: '💵' },
-  { id: 'card', label: 'Card', icon: '💳' },
-  { id: 'other', label: 'Other', icon: '🔁' },
+  { id: 'cash', icon: '💵' },
+  { id: 'card', icon: '💳' },
+  { id: 'other', icon: '🔁' },
 ];
 
 export const CURRENCIES = [
@@ -43,7 +44,9 @@ export const CURRENCIES = [
   'PLN', 'BRL', 'MXN', 'ZAR', 'NGN', 'KES', 'IDR', 'MYR', 'SGD', 'PHP', 'THB', 'RUB',
 ];
 
-const DEFAULT_SETTINGS = { key: 'settings', currency: 'USD', budget: null, theme: 'system' };
+const DEFAULT_SETTINGS = {
+  key: 'settings', currency: 'USD', budget: null, theme: 'system', language: 'auto',
+};
 
 export const state = {
   expenses: [],
@@ -178,7 +181,7 @@ export async function saveCategory(data) {
 
 /** Delete a category; its expenses and recurring rules move to `fallbackId`. */
 export async function deleteCategory(id, fallbackId) {
-  if (state.categories.length <= 1) throw new Error('At least one category is required.');
+  if (state.categories.length <= 1) throw new Error(t('needOneCategory'));
   const moved = state.expenses.filter((e) => e.categoryId === id);
   moved.forEach((e) => { e.categoryId = fallbackId; });
   const movedRec = state.recurring.filter((r) => r.categoryId === id);
@@ -288,7 +291,7 @@ export function exportBackup() {
 
 export async function importBackup(data) {
   if (!data || typeof data !== 'object' || !Array.isArray(data.expenses) || !Array.isArray(data.categories)) {
-    throw new Error('This file is not an Expenses backup.');
+    throw new Error(t('notBackup'));
   }
   const categories = data.categories
     .filter((c) => c && c.id)
@@ -297,7 +300,7 @@ export async function importBackup(data) {
       color: c.color || CATEGORY_COLORS[i % CATEGORY_COLORS.length],
       order: Number.isFinite(c.order) ? c.order : i, budget: c.budget > 0 ? round2(c.budget) : null,
     }));
-  if (!categories.length) throw new Error('Backup has no categories.');
+  if (!categories.length) throw new Error(t('notBackup'));
   const prevCats = state.categories;
   state.categories = categories; // normalizeExpense falls back to these
   const expenses = data.expenses
@@ -319,7 +322,9 @@ export async function importBackup(data) {
 
 export async function resetAll() {
   const categories = DEFAULT_CATEGORIES.map((c) => ({ ...c }));
-  const settings = { ...DEFAULT_SETTINGS, currency: state.settings.currency, theme: state.settings.theme };
+  const settings = {
+    ...DEFAULT_SETTINGS, currency: state.settings.currency, theme: state.settings.theme, language: state.settings.language,
+  };
   await db.replaceAll({ categories, expenses: [], recurring: [], meta: [settings] });
   Object.assign(state, { categories, expenses: [], recurring: [], settings });
   emit();
