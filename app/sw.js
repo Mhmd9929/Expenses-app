@@ -1,6 +1,6 @@
 // Service worker: precache the app shell so Expenses works fully offline.
 // Bump VERSION whenever app files change so clients pick up the update.
-const VERSION = 'v1.0.0';
+const VERSION = 'v1.1.0';
 const CACHE = `expenses-${VERSION}`;
 
 const ASSETS = [
@@ -13,6 +13,7 @@ const ASSETS = [
   './js/store.js',
   './js/db.js',
   './js/utils.js',
+  './js/i18n.js',
   './js/ui.js',
   './js/charts.js',
   './js/views/home.js',

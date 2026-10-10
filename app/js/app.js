@@ -2,6 +2,7 @@
 import * as store from './store.js';
 import { parseRoute } from './router.js';
 import { initTooltip, toast } from './ui.js';
+import { setLang, t } from './i18n.js';
 import * as home from './views/home.js';
 import * as add from './views/add.js';
 import * as list from './views/list.js';
@@ -35,6 +36,16 @@ function render() {
     void el.offsetWidth;
     el.classList.add('enter');
   }
+}
+
+// ---------- language ----------
+
+/** Apply the language setting: direction, static labels, and re-render. */
+export function applyLanguage() {
+  setLang(store.state.settings.language);
+  document.title = t('appName');
+  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  if (current) render();
 }
 
 // ---------- theme ----------
@@ -77,8 +88,8 @@ function registerSW() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
   navigator.serviceWorker.register('./sw.js').then((reg) => {
     const offerUpdate = (worker) => {
-      toast('A new version is available', {
-        action: 'Update', duration: 15000,
+      toast(t('newVersion'), {
+        action: t('update'), duration: 15000,
         onAction: () => {
           updateRequested = true;
           worker.postMessage({ type: 'SKIP_WAITING' });
@@ -107,7 +118,7 @@ function registerSW() {
 async function runRecurring() {
   const added = await store.applyRecurring();
   if (added.length) {
-    toast(`↻ Added ${added.length} recurring expense${added.length === 1 ? '' : 's'}`);
+    toast(t('recurringApplied', added.length));
   }
 }
 
@@ -115,11 +126,12 @@ async function boot() {
   try {
     await store.load();
   } catch (err) {
-    viewEl().innerHTML = `<div class="empty"><p class="empty-icon">⚠️</p><p>Couldn’t open local storage.</p>
-      <p class="muted small">${String(err?.message || err)}. Private browsing modes may block storage.</p></div>`;
+    viewEl().innerHTML = `<div class="empty"><p class="empty-icon">⚠️</p><p>${t('storageError')}</p>
+      <p class="muted small">${t('storageHint')}</p></div>`;
     return;
   }
   applyTheme();
+  applyLanguage();
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
   initTooltip();
   window.addEventListener('hashchange', render);

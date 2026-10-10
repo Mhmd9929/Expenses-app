@@ -6,6 +6,7 @@ import { esc, currentMonth } from '../utils.js';
 import {
   money, openSheet, confirmDialog, toast, progressBar, statusBadge,
 } from '../ui.js';
+import { t, catName } from '../i18n.js';
 
 export function openCategoryEditor(cat) {
   const isNew = !cat;
@@ -16,21 +17,21 @@ export function openCategoryEditor(cat) {
   const dlg = openSheet(`
     <form class="cat-form" method="dialog" novalidate>
       <div class="sheet-head">
-        <button type="button" class="icon-btn" data-close aria-label="Cancel">✕</button>
-        <h2 class="sheet-title">${isNew ? 'New category' : 'Edit category'}</h2>
+        <button type="button" class="icon-btn" data-close aria-label="${esc(t('cancel'))}">✕</button>
+        <h2 class="sheet-title">${esc(t(isNew ? 'newCategory' : 'editCategory'))}</h2>
         <span class="icon-btn-spacer"></span>
       </div>
       <div class="cat-preview"><span class="cat-dot big" style="--c:${esc(c.color)}">${esc(c.icon)}</span></div>
-      <label class="field"><span class="field-label">Name</span>
-        <input name="name" value="${esc(c.name)}" required maxlength="40" placeholder="e.g. Coffee" autocomplete="off"></label>
-      <label class="field"><span class="field-label">Monthly budget (optional)</span>
-        <input name="budget" type="number" inputmode="decimal" min="0" step="0.01" value="${c.budget || ''}" placeholder="No budget"></label>
-      <div class="field"><span class="field-label">Icon</span>
+      <label class="field"><span class="field-label">${esc(t('name'))}</span>
+        <input name="name" value="${esc(catName(c))}" required maxlength="40" placeholder="${esc(t('namePlaceholder'))}" autocomplete="off"></label>
+      <label class="field"><span class="field-label">${esc(t('budgetOptional'))}</span>
+        <input name="budget" type="number" inputmode="decimal" min="0" step="0.01" value="${c.budget || ''}" placeholder="${esc(t('noBudgetPlaceholder'))}"></label>
+      <div class="field"><span class="field-label">${esc(t('icon'))}</span>
         <div class="icon-grid">${CATEGORY_ICONS.map((i) => `<button type="button" class="icon-opt" data-icon="${esc(i)}" aria-pressed="${i === c.icon}">${esc(i)}</button>`).join('')}</div></div>
-      <div class="field"><span class="field-label">Color</span>
-        <div class="color-grid">${CATEGORY_COLORS.map((col) => `<button type="button" class="color-opt" data-color="${col}" style="--c:${col}" aria-label="Color ${col}" aria-pressed="${col === c.color}"></button>`).join('')}</div></div>
-      <button type="submit" class="btn primary big">${isNew ? 'Add category' : 'Save'}</button>
-      ${isNew ? '' : `<button type="button" class="btn danger-outline" data-action="delete">Delete category${count ? ` (${count} expense${count === 1 ? '' : 's'})` : ''}</button>`}
+      <div class="field"><span class="field-label">${esc(t('color'))}</span>
+        <div class="color-grid">${CATEGORY_COLORS.map((col) => `<button type="button" class="color-opt" data-color="${col}" style="--c:${col}" aria-label="${esc(t('color'))} ${col}" aria-pressed="${col === c.color}"></button>`).join('')}</div></div>
+      <button type="submit" class="btn primary big">${esc(t(isNew ? 'addCategory' : 'save'))}</button>
+      ${isNew ? '' : `<button type="button" class="btn danger-outline" data-action="delete">${esc(count ? t('deleteCategoryCount', count) : t('deleteCategory'))}</button>`}
     </form>`);
   const form = dlg.querySelector('form');
   const preview = dlg.querySelector('.cat-preview .cat-dot');
@@ -51,27 +52,30 @@ export function openCategoryEditor(cat) {
   });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = form.name.value.trim();
-    if (!name) { form.name.focus(); toast('Give the category a name'); return; }
-    if (state.categories.some((x) => x.id !== cat?.id && x.name.toLowerCase() === name.toLowerCase())) {
-      toast('A category with that name already exists'); return;
+    const entered = form.name.value.trim();
+    if (!entered) { form.name.focus(); toast(t('giveName')); return; }
+    // Keep the stored name when a translated built-in name wasn't changed.
+    const name = cat && entered === catName(cat) ? cat.name : entered;
+    const lower = entered.toLowerCase();
+    if (state.categories.some((x) => x.id !== cat?.id && (x.name.toLowerCase() === lower || catName(x).toLowerCase() === lower))) {
+      toast(t('nameExists')); return;
     }
     await saveCategory({ ...(cat || {}), name, icon, color, budget: parseFloat(form.budget.value) || null });
     dlg.close();
-    toast(isNew ? `Added “${name}”` : 'Category saved');
+    toast(isNew ? t('added', { name: entered }) : t('categorySaved'));
   });
   dlg.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
-    if (state.categories.length <= 1) { toast('You need at least one category'); return; }
+    if (state.categories.length <= 1) { toast(t('needOneCategory')); return; }
     const fallback = fallbackCategoryFor(cat.id);
     const ok = await confirmDialog({
-      title: `Delete “${cat.name}”?`,
-      message: count ? `${count} expense${count === 1 ? '' : 's'} will be moved to “${fallback.name}”.` : 'This category has no expenses.',
-      ok: 'Delete', danger: true,
+      title: t('deleteCatTitle', { name: catName(cat) }),
+      message: count ? t('willMove', count, catName(fallback)) : t('noCatExpenses'),
+      ok: t('delete'), danger: true,
     });
     if (!ok) return;
     await deleteCategory(cat.id, fallback.id);
     dlg.close();
-    toast(`Deleted “${cat.name}”`);
+    toast(t('deleted', { name: catName(cat) }));
   });
   return dlg;
 }
@@ -79,22 +83,22 @@ export function openCategoryEditor(cat) {
 export function render(root) {
   const totals = categoryTotals(currentMonth());
   root.innerHTML = `
-    <header class="page-head"><h1>Categories</h1>
-      <button type="button" class="icon-btn accent" data-action="new" aria-label="Add category">＋</button></header>
-    <p class="muted small">This month’s spending per category. Tap to rename, change icon, color or budget.</p>
+    <header class="page-head"><h1>${esc(t('categoriesTitle'))}</h1>
+      <button type="button" class="icon-btn accent" data-action="new" aria-label="${esc(t('addCategory'))}">＋</button></header>
+    <p class="muted small">${esc(t('categoriesHint'))}</p>
     <ul class="list card-list cats">
       ${state.categories.map((c) => {
     const spent = totals[c.id] || 0;
     return `<li><button type="button" class="row" data-id="${esc(c.id)}">
           <span class="cat-dot" style="--c:${esc(c.color)}">${esc(c.icon)}</span>
-          <span class="row-main"><span class="row-title">${esc(c.name)} ${statusBadge(spent, c.budget)}</span>
-            <span class="row-sub">${esc(money(spent))}${c.budget ? ` of ${esc(money(c.budget))}` : ' · no budget'}</span>
+          <span class="row-main"><span class="row-title">${esc(catName(c))} ${statusBadge(spent, c.budget)}</span>
+            <span class="row-sub">${esc(c.budget ? t('ofAmount', { spent: money(spent), budget: money(c.budget) }) : t('noBudget', { spent: money(spent) }))}</span>
             ${c.budget ? progressBar(spent, c.budget) : ''}</span>
           <span class="chev" aria-hidden="true">›</span>
         </button></li>`;
   }).join('')}
     </ul>
-    <button type="button" class="btn secondary big" data-action="new">＋ New category</button>`;
+    <button type="button" class="btn secondary big" data-action="new">${esc(t('newCategoryBtn'))}</button>`;
 
   root.querySelectorAll('[data-action="new"]').forEach((b) => b.addEventListener('click', () => openCategoryEditor()));
   root.querySelector('.cats').addEventListener('click', (e) => {

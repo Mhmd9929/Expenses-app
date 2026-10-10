@@ -310,6 +310,73 @@ await test('manifest and offline support', async (page, ctx) => {
   await ctx.setOffline(false);
 });
 
+await test('Arabic: language switch, RTL layout and translated UI', async (page) => {
+  await go(page, 'settings');
+  await page.click('[data-lang-opt="ar"]');
+  await page.waitForSelector('html[dir="rtl"][lang="ar"]');
+  assert.equal(await page.textContent('.tabbar [data-i18n="tab.home"]'), 'الرئيسية');
+  assert.match(await page.textContent('.page-head h1'), /الإعدادات/);
+
+  await addExpense(page, { amount: '25', cat: 'طعام', method: 'cash', note: 'غداء' });
+  assert.match(await toastText(page), /تم حفظ/);
+  assert.match(await page.textContent('.hero'), /مصروفات هذا الشهر/);
+  assert.match(await page.textContent('[data-testid="month-total"]'), /25\.00/);
+  assert.match(await page.textContent('#recent'), /غداء[\s\S]*طعام · اليوم · نقدًا/);
+  await page.screenshot({ path: path.join(outDir, 'ar-home.png') });
+
+  // In RTL, swiping right reveals the actions.
+  const row = page.locator('#recent .swipe-content').first();
+  const box = await row.boundingBox();
+  await page.mouse.move(box.x + 20, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 120, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.move(box.x + 220, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await page.waitForSelector('#recent .swipe.open');
+  assert.equal(await page.textContent('#recent .swipe.open [data-act="delete"]'), 'حذف');
+  const actions = await page.locator('#recent .swipe.open .swipe-actions').boundingBox();
+  assert.ok(actions.x < box.x + 10, 'actions sit on the left edge in RTL');
+
+  await go(page, 'list');
+  assert.equal(await page.textContent('[data-testid="result-count"]'), 'عدد المصروفات: 1');
+  await page.fill('input[name=q]', 'طعام');
+  assert.equal(await page.textContent('[data-testid="result-count"]'), 'عدد المصروفات: 1');
+
+  await go(page, 'reports');
+  assert.match(await page.textContent('[data-testid="ins-top"]'), /طعام/);
+  await page.screenshot({ path: path.join(outDir, 'ar-reports.png'), fullPage: true });
+
+  // Saving a built-in category without renaming keeps its stored English name.
+  await go(page, 'categories');
+  assert.match(await page.textContent('.cats'), /فواتير ومرافق/);
+  await page.click('.cats .row:has-text("طعام")');
+  assert.equal(await page.inputValue('dialog input[name=name]'), 'طعام');
+  await page.click('dialog button[type=submit]');
+  await page.screenshot({ path: path.join(outDir, 'ar-categories.png') });
+
+  await go(page, 'add');
+  await page.screenshot({ path: path.join(outDir, 'ar-add.png') });
+
+  // Back to English: built-in names come back in English.
+  await go(page, 'settings');
+  await page.click('[data-lang-opt="en"]');
+  await page.waitForSelector('html[dir="ltr"][lang="en"]');
+  await go(page, 'categories');
+  assert.match(await page.textContent('.cats'), /Food/);
+  await page.reload();
+  await page.waitForSelector('html.ready');
+  assert.equal(await page.getAttribute('html', 'dir'), 'ltr');
+});
+
+await test('Arabic is picked automatically on Arabic devices', async () => {
+  const ctx = await browser.newContext({ ...device, locale: 'ar-EG' });
+  const page = await ctx.newPage();
+  await go(page, 'home');
+  assert.equal(await page.getAttribute('html', 'dir'), 'rtl');
+  assert.match(await page.textContent('.page-head h1'), /المصروفات/);
+  await ctx.close();
+});
+
 await browser.close();
 server.kill();
 console.log(failures ? `\n${failures} test(s) failed` : '\nAll tests passed');

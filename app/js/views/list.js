@@ -6,6 +6,7 @@ import {
 } from '../utils.js';
 import { money, expenseRow, enableSwipe } from '../ui.js';
 import { navigate } from '../router.js';
+import { t, catName } from '../i18n.js';
 
 // Filters persist while the app is open.
 const filters = { month: currentMonth(), category: '', method: '', q: '' };
@@ -19,7 +20,8 @@ function filtered() {
     if (filters.category && e.categoryId !== filters.category) return false;
     if (filters.method && e.method !== filters.method) return false;
     if (q) {
-      const hay = `${e.note} ${catById(e.categoryId).name} ${e.amount}`.toLowerCase();
+      const c = catById(e.categoryId);
+      const hay = `${e.note} ${c.name} ${catName(c)} ${e.amount}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -29,8 +31,8 @@ function filtered() {
 function resultsHtml() {
   const items = filtered();
   if (!items.length) {
-    return `<div class="empty"><p class="empty-icon">🔍</p><p>No matching expenses.</p>
-      ${state.expenses.length ? '<button type="button" class="btn secondary" data-action="clear">Clear filters</button>' : ''}</div>`;
+    return `<div class="empty"><p class="empty-icon">🔍</p><p>${esc(t('noMatches'))}</p>
+      ${state.expenses.length ? `<button type="button" class="btn secondary" data-action="clear">${esc(t('clearFilters'))}</button>` : ''}</div>`;
   }
   const total = round2(items.reduce((s, e) => s + e.amount, 0));
   const groups = new Map();
@@ -38,7 +40,7 @@ function resultsHtml() {
     if (!groups.has(e.date)) groups.set(e.date, []);
     groups.get(e.date).push(e);
   }
-  let html = `<p class="result-summary"><span data-testid="result-count">${items.length} expense${items.length === 1 ? '' : 's'}</span>
+  let html = `<p class="result-summary"><span data-testid="result-count">${esc(t('expenseCount', items.length))}</span>
     <strong data-testid="result-total">${esc(money(total))}</strong></p>`;
   for (const [date, list] of groups) {
     const dayTotal = list.reduce((s, e) => s + e.amount, 0);
@@ -54,15 +56,15 @@ export function render(root) {
   const opt = (v, label, sel) => `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(label)}</option>`;
 
   root.innerHTML = `
-    <header class="page-head"><h1>All expenses</h1>
-      <button type="button" class="icon-btn accent" data-action="add" aria-label="Add expense">＋</button></header>
+    <header class="page-head"><h1>${esc(t('allExpenses'))}</h1>
+      <button type="button" class="icon-btn accent" data-action="add" aria-label="${esc(t('addTitle'))}">＋</button></header>
     <div class="search">
-      <input type="search" name="q" placeholder="Search notes, categories, amounts" value="${esc(filters.q)}" aria-label="Search" autocomplete="off">
+      <input type="search" name="q" placeholder="${esc(t('search'))}" value="${esc(filters.q)}" aria-label="${esc(t('search'))}" autocomplete="off">
     </div>
     <div class="filters">
-      <select name="month" aria-label="Month">${opt('', 'All months', filters.month)}${months.map((m) => opt(m, monthLabel(m), filters.month)).join('')}</select>
-      <select name="category" aria-label="Category">${opt('', 'All categories', filters.category)}${state.categories.map((c) => opt(c.id, `${c.icon} ${c.name}`, filters.category)).join('')}</select>
-      <select name="method" aria-label="Payment method">${opt('', 'Any payment', filters.method)}${METHODS.map((m) => opt(m.id, m.label, filters.method)).join('')}</select>
+      <select name="month" aria-label="${esc(t('month'))}">${opt('', t('allMonths'), filters.month)}${months.map((m) => opt(m, monthLabel(m), filters.month)).join('')}</select>
+      <select name="category" aria-label="${esc(t('category'))}">${opt('', t('allCategories'), filters.category)}${state.categories.map((c) => opt(c.id, `${c.icon} ${catName(c)}`, filters.category)).join('')}</select>
+      <select name="method" aria-label="${esc(t('paymentMethod'))}">${opt('', t('anyPayment'), filters.method)}${METHODS.map((m) => opt(m.id, t(`method.${m.id}`), filters.method)).join('')}</select>
     </div>
     <div id="results">${resultsHtml()}</div>`;
 

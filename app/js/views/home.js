@@ -8,6 +8,7 @@ import {
   money, expenseRow, enableSwipe, progressBar,
 } from '../ui.js';
 import { navigate } from '../router.js';
+import { t, catName } from '../i18n.js';
 
 export function render(root) {
   const month = currentMonth();
@@ -23,13 +24,13 @@ export function render(root) {
     const left = budget - total;
     budgetHtml = `
       <div class="budget-line-text">
-        <span class="${left < 0 ? 'neg' : ''}" data-testid="remaining">${left >= 0 ? `${esc(money(left))} left` : `${esc(money(-left))} over budget`}</span>
-        <span class="muted">of ${esc(money(budget))}</span>
+        <span class="${left < 0 ? 'neg' : ''}" data-testid="remaining">${esc(left >= 0 ? t('left', { amount: money(left) }) : t('overBudget', { amount: money(-left) }))}</span>
+        <span class="muted">${esc(t('ofBudget', { amount: money(budget) }))}</span>
       </div>
       ${progressBar(total, budget)}
-      <div class="muted small">${left > 0 ? `${esc(money(left / (daysInMonth(month) - day + 1)))} per day for the rest of the month` : ''}</div>`;
+      <div class="muted small">${left > 0 ? esc(t('perDayRest', { amount: money(left / (daysInMonth(month) - day + 1)) })) : ''}</div>`;
   } else {
-    budgetHtml = '<a class="link small" href="#/settings">Set a monthly budget →</a>';
+    budgetHtml = `<a class="link small" href="#/settings">${esc(t('setBudget'))}</a>`;
   }
 
   const alerts = state.categories
@@ -39,32 +40,32 @@ export function render(root) {
       const over = spent >= c.budget;
       return `<li class="alert ${over ? 'critical' : 'warning'}">
         <span class="alert-icon" aria-hidden="true">${over ? '⛔' : '⚠️'}</span>
-        <span class="row-main"><span class="row-title">${esc(c.icon)} ${esc(c.name)}</span>
-        <span class="row-sub">${over ? 'Over budget' : `${Math.round((spent / c.budget) * 100)}% of budget used`} · ${esc(money(spent))} / ${esc(money(c.budget))}</span></span>
+        <span class="row-main"><span class="row-title">${esc(c.icon)} ${esc(catName(c))}</span>
+        <span class="row-sub">${esc(over ? t('overBudgetShort') : t('pctUsed', { pct: Math.round((spent / c.budget) * 100) }))} · ${esc(money(spent))} / ${esc(money(c.budget))}</span></span>
       </li>`;
     }).join('');
 
   root.innerHTML = `
     <header class="page-head">
-      <div><p class="eyebrow">${esc(monthLabel(month))}</p><h1>Expenses</h1></div>
+      <div><p class="eyebrow">${esc(monthLabel(month))}</p><h1>${esc(t('appName'))}</h1></div>
     </header>
     <section class="card hero">
-      <p class="muted">Spent this month</p>
+      <p class="muted">${esc(t('spentThisMonth'))}</p>
       <p class="hero-amount" data-testid="month-total">${esc(money(total))}</p>
       ${budgetHtml}
     </section>
-    <button type="button" class="btn primary big add-btn" data-testid="add-expense">＋ Add expense</button>
+    <button type="button" class="btn primary big add-btn" data-testid="add-expense">${esc(t('addExpense'))}</button>
     <section class="stats">
-      <div class="stat"><span class="muted small">Today</span><strong>${esc(money(todayTotal))}</strong></div>
-      <div class="stat"><span class="muted small">Daily average</span><strong>${esc(money(total / day))}</strong></div>
+      <div class="stat"><span class="muted small">${esc(t('today'))}</span><strong>${esc(money(todayTotal))}</strong></div>
+      <div class="stat"><span class="muted small">${esc(t('dailyAverage'))}</span><strong>${esc(money(total / day))}</strong></div>
     </section>
-    ${alerts ? `<section><h2 class="section-title">Budget alerts</h2><ul class="list alerts">${alerts}</ul></section>` : ''}
+    ${alerts ? `<section><h2 class="section-title">${esc(t('budgetAlerts'))}</h2><ul class="list alerts">${alerts}</ul></section>` : ''}
     <section>
-      <div class="section-head"><h2 class="section-title">Recent</h2>${recent.length ? '<a class="link" href="#/list">See all</a>' : ''}</div>
+      <div class="section-head"><h2 class="section-title">${esc(t('recent'))}</h2>${recent.length ? `<a class="link" href="#/list">${esc(t('seeAll'))}</a>` : ''}</div>
       ${recent.length
     ? `<ul class="list card-list" id="recent">${recent.map((e) => expenseRow(e, { showDate: true })).join('')}</ul>
-           <p class="hint">Tip: swipe left on an expense to edit or delete it.</p>`
-    : `<div class="empty"><p class="empty-icon">🧾</p><p>No expenses yet.</p><p class="muted small">Tap “Add expense” to log your first one.</p></div>`}
+           <p class="hint">${esc(t('swipeHint'))}</p>`
+    : `<div class="empty"><p class="empty-icon">🧾</p><p>${esc(t('noExpenses'))}</p><p class="muted small">${esc(t('noExpensesHint'))}</p></div>`}
     </section>`;
 
   root.querySelector('.add-btn').addEventListener('click', () => navigate('add'));
